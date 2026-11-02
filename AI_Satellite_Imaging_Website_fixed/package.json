@@ -2,11 +2,20 @@
   "name": "ai-satellite-imaging-website",
   "private": true,
   "version": "0.1.0",
+  "description": "AI satellite imaging website built with React, Vite, and Tailwind CSS",
   "type": "module",
+  "engines": {
+    "node": ">=20.19.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "dev": "vite",
+    "dev:host": "vite --host",
     "build": "vite build",
-    "preview": "vite preview"
+    "build:check": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"import('node:fs').then(f=>f.rmSync('dist',{recursive:true,force:true}))\""
   },
   "dependencies": {
     "lucide-react": "0.487.0",
@@ -16,6 +25,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.1.12",
+    "@types/node": "22.10.2",
     "@types/react": "18.3.18",
     "@types/react-dom": "18.3.5",
     "@vitejs/plugin-react": "4.7.0",
