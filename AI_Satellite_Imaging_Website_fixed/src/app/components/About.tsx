@@ -1,11 +1,33 @@
-import { motion } from 'motion/react';
-import { Rocket, Target, Eye } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { motion, useMotionTemplate, useMotionValue } from 'motion/react';
+import { Rocket, Target, Eye, ChevronRight, type LucideIcon } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { useState } from 'react';
 import { SatelliteModal } from './SatelliteModal';
 
-// Satellite data backend
-const satelliteData = {
+/* ------------------------------------------------------------------ */
+/* Data (module scope, typed, single source of truth)                  */
+/* ------------------------------------------------------------------ */
+
+interface SatelliteInfo {
+  id: string;
+  name: string;
+  type: string;
+  orbit: string;
+  altitude: string;
+  speed: string;
+  launched: string;
+  mission: string;
+  status: 'Active' | 'Inactive' | 'Decommissioned';
+  operator: string;
+  country: string;
+  description: string;
+}
+
+type SatelliteKey = 'missionControl' | 'precisionTracking' | 'orbitalWatch';
+
+// NOTE: StarLink-4A and NaviStar GPS-III Explorer look like illustrative names;
+// replace with real designations if this is meant to be factual.
+const SATELLITES: Record<SatelliteKey, SatelliteInfo> = {
   missionControl: {
     id: 'sat-001',
     name: 'StarLink-4A Mission Satellite',
@@ -18,7 +40,8 @@ const satelliteData = {
     status: 'Active',
     operator: 'SpaceX',
     country: 'United States',
-    description: 'Advanced communication satellite equipped with phased-array antennas and laser inter-satellite links for high-speed data transmission. Part of the next-generation constellation providing global internet coverage with ultra-low latency.'
+    description:
+      'Advanced communication satellite equipped with phased-array antennas and laser inter-satellite links for high-speed data transmission. Part of the next-generation constellation providing global internet coverage with ultra-low latency.',
   },
   precisionTracking: {
     id: 'sat-003',
@@ -32,7 +55,8 @@ const satelliteData = {
     status: 'Active',
     operator: 'U.S. Space Force',
     country: 'United States',
-    description: 'Next-generation GPS satellite featuring atomic clock precision timing, enhanced signal strength, and improved accuracy. Provides sub-meter positioning accuracy for critical infrastructure, aviation, and scientific applications worldwide.'
+    description:
+      'Next-generation GPS satellite featuring atomic clock precision timing, enhanced signal strength, and improved accuracy. Provides sub-meter positioning accuracy for critical infrastructure, aviation, and scientific applications worldwide.',
   },
   orbitalWatch: {
     id: 'sat-002',
@@ -46,46 +70,134 @@ const satelliteData = {
     status: 'Active',
     operator: 'ESA (European Space Agency)',
     country: 'European Union',
-    description: 'Sentinel-2A delivers 10-meter resolution optical imagery across 13 spectral bands, covering the full Earth every 10 days. Its data powers AI-driven environmental monitoring — detecting deforestation, wildfires, flood extent, and urban growth in near real-time.'
-  }
+    description:
+      'Sentinel-2A delivers 10-meter resolution optical imagery across 13 spectral bands, covering the full Earth every 10 days. Its data powers AI-driven environmental monitoring: detecting deforestation, wildfires, flood extent, and urban growth in near real-time.',
+  },
 };
+
+interface Feature {
+  key: SatelliteKey;
+  icon: LucideIcon;
+  /** i18n keys, with English fallbacks for anything not yet translated */
+  titleKey: string;
+  descKey: string;
+  fallbackTitle: string;
+  fallbackDesc: string;
+}
+
+const FEATURES: Feature[] = [
+  {
+    key: 'missionControl', icon: Rocket,
+    titleKey: 'about.feature1.title', descKey: 'about.feature1.desc',
+    fallbackTitle: 'Mission Control', fallbackDesc: 'Global satellite communication and mission operations.',
+  },
+  {
+    key: 'precisionTracking', icon: Target,
+    titleKey: 'about.feature3.title', descKey: 'about.feature3.desc',
+    fallbackTitle: 'Precision Tracking', fallbackDesc: 'High-accuracy positioning and navigation services.',
+  },
+  {
+    key: 'orbitalWatch', icon: Eye,
+    titleKey: 'about.feature4.title', descKey: 'about.feature4.desc',
+    fallbackTitle: 'Orbital Watch',
+    fallbackDesc:
+      '24/7 planetary surveillance using high-resolution multispectral imaging satellites for real-time environmental threat detection.',
+  },
+];
+
+/* ------------------------------------------------------------------ */
+/* Card with cursor-following spotlight                                */
+/* ------------------------------------------------------------------ */
+
+interface CardProps {
+  feature: Feature;
+  title: string;
+  desc: string;
+  sat: SatelliteInfo;
+  index: number;
+  onOpen: (key: SatelliteKey) => void;
+  detailsLabel: string;
+}
+
+function FeatureCard({ feature, title, desc, sat, index, onOpen, detailsLabel }: CardProps) {
+  const Icon = feature.icon;
+  const mx = useMotionValue(-200);
+  const my = useMotionValue(-200);
+  const spotlight = useMotionTemplate`radial-gradient(260px circle at ${mx}px ${my}px, rgba(34,211,238,0.14), transparent 70%)`;
+
+  return (
+    <motion.button
+      type="button"
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.6, delay: index * 0.1 }}
+      whileHover={{ y: -4 }}
+      whileTap={{ scale: 0.985 }}
+      onMouseMove={(e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        mx.set(e.clientX - r.left);
+        my.set(e.clientY - r.top);
+      }}
+      onClick={() => onOpen(feature.key)}
+      aria-haspopup="dialog"
+      className="relative overflow-hidden text-left backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-6 hover:border-cyan-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70 transition-colors duration-300 group cursor-pointer"
+    >
+      <motion.div aria-hidden className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: spotlight }} />
+
+      <div className="relative">
+        <div className="w-12 h-12 bg-cyan-500/10 border border-cyan-500/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-cyan-500/20 group-hover:scale-110 transition-all duration-300">
+          <Icon className="w-6 h-6 text-cyan-400" />
+        </div>
+
+        <h3 className="text-white mb-2">{title}</h3>
+        <p className="text-white/60 text-sm mb-4">{desc}</p>
+
+        {/* Live preview of the linked satellite */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <span className="px-2.5 py-1 rounded-full text-xs bg-white/5 border border-white/10 text-white/70">
+            {sat.orbit.match(/\(([^)]+)\)/)?.[1] ?? sat.orbit}
+          </span>
+          <span className="px-2.5 py-1 rounded-full text-xs bg-white/5 border border-white/10 text-white/70">{sat.altitude}</span>
+          <span className="px-2.5 py-1 rounded-full text-xs bg-green-500/10 border border-green-400/30 text-green-400">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-400 mr-1.5 animate-pulse" />
+            {sat.status}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1 text-cyan-400 text-sm opacity-60 group-hover:opacity-100 transition-opacity duration-300">
+          <span>{detailsLabel}</span>
+          <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+        </div>
+      </div>
+    </motion.button>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Section                                                             */
+/* ------------------------------------------------------------------ */
 
 export function About() {
   const { t } = useLanguage();
-  const [selectedSatellite, setSelectedSatellite] = useState<any>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Store only the key; the modal's open state is derived from it.
+  const [selectedKey, setSelectedKey] = useState<SatelliteKey | null>(null);
+  // Keep the last satellite so the modal's exit animation still has content.
+  const [lastKey, setLastKey] = useState<SatelliteKey | null>(null);
 
-  const features = [
-    {
-      icon: Rocket,
-      titleKey: 'about.feature1.title',
-      descKey: 'about.feature1.desc',
-      satelliteKey: 'missionControl',
-    },
-    {
-      icon: Target,
-      titleKey: 'about.feature3.title',
-      descKey: 'about.feature3.desc',
-      satelliteKey: 'precisionTracking',
-    },
-    {
-      icon: Eye,
-      title: 'Orbital Watch',
-      desc: '24/7 planetary surveillance using high-resolution multispectral imaging satellites for real-time environmental threat detection.',
-      satelliteKey: 'orbitalWatch',
-    },
-  ];
+  const open = useCallback((key: SatelliteKey) => { setSelectedKey(key); setLastKey(key); }, []);
+  const close = useCallback(() => setSelectedKey(null), []);
 
-  const handleCardClick = (satelliteKey: keyof typeof satelliteData) => {
-    setSelectedSatellite(satelliteData[satelliteKey]);
-    setIsModalOpen(true);
+  /** Translate with an English fallback when the key is missing (t usually echoes the key). */
+  const tr = (key: string, fallback: string) => {
+    const v = t(key);
+    return !v || v === key ? fallback : v;
   };
 
   return (
     <>
-      <section className="relative py-32 px-8" id="about">
+      <section className="relative py-32 px-8" id="about" aria-labelledby="about-heading">
         <div className="max-w-[1400px] mx-auto">
-          {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -97,50 +209,31 @@ export function About() {
               <Rocket className="w-4 h-4 text-cyan-400" />
               <span className="text-cyan-400 text-sm">{t('about.badge')}</span>
             </div>
-            <h2 className="text-white mb-6">{t('about.title')}</h2>
-            <p className="text-white/70 max-w-3xl mx-auto text-lg">
-              {t('about.description')}
-            </p>
+            <h2 id="about-heading" className="text-white mb-6">{t('about.title')}</h2>
+            <p className="text-white/70 max-w-3xl mx-auto text-lg">{t('about.description')}</p>
           </motion.div>
 
-          {/* Features Grid */}
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {features.map((feature, index) => (
-              <motion.div
-                key={feature.satelliteKey}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-                viewport={{ once: true }}
-                onClick={() => handleCardClick(feature.satelliteKey as keyof typeof satelliteData)}
-                className="backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 hover:border-cyan-500/30 transition-all duration-300 group cursor-pointer"
-              >
-                <div className="w-12 h-12 bg-cyan-500/10 border border-cyan-500/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-cyan-500/20 group-hover:scale-110 transition-all duration-300">
-                  <feature.icon className="w-6 h-6 text-cyan-400" />
-                </div>
-                <h3 className="text-white mb-2">
-                  {'titleKey' in feature ? t(feature.titleKey) : feature.title}
-                </h3>
-                <p className="text-white/60 text-sm mb-4">
-                  {'descKey' in feature ? t(feature.descKey) : feature.desc}
-                </p>
-                <div className="flex items-center gap-2 text-cyan-400 text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <span>View Details</span>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </motion.div>
+            {FEATURES.map((f, i) => (
+              <FeatureCard
+                key={f.key}
+                feature={f}
+                index={i}
+                sat={SATELLITES[f.key]}
+                title={tr(f.titleKey, f.fallbackTitle)}
+                desc={tr(f.descKey, f.fallbackDesc)}
+                detailsLabel={tr('about.viewDetails', 'View Details')}
+                onOpen={open}
+              />
             ))}
           </div>
         </div>
       </section>
 
-      {/* Satellite Modal */}
       <SatelliteModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        satellite={selectedSatellite}
+        isOpen={selectedKey !== null}
+        onClose={close}
+        satellite={lastKey ? SATELLITES[lastKey] : null}
       />
     </>
   );
