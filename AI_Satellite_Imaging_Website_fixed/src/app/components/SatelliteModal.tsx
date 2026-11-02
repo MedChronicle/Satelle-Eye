@@ -1,8 +1,10 @@
-import { motion, AnimatePresence } from 'motion/react';
+import { useEffect, useId, useRef } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { X, Satellite, Activity, Globe, Zap } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
-interface SatelliteData {
+export interface SatelliteData {
   id: string;
   name: string;
   type: string;
@@ -23,161 +25,136 @@ interface SatelliteModalProps {
   satellite: SatelliteData | null;
 }
 
-export function SatelliteModal({ isOpen, onClose, satellite }: SatelliteModalProps) {
-  const { t } = useLanguage();
+interface StatCard {
+  key: 'orbit' | 'altitude' | 'speed' | 'launched';
+  icon: LucideIcon | null;
+  box: string;
+  tint: string;
+}
 
-  if (!satellite) return null;
+const STAT_CARDS: StatCard[] = [
+  { key: 'orbit', icon: Globe, box: 'bg-cyan-500/20', tint: 'text-cyan-400' },
+  { key: 'altitude', icon: Activity, box: 'bg-blue-500/20', tint: 'text-blue-400' },
+  { key: 'speed', icon: Zap, box: 'bg-purple-500/20', tint: 'text-purple-400' },
+  { key: 'launched', icon: null, box: 'bg-orange-500/20', tint: 'text-orange-400' },
+];
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function statusClasses(status: string): string {
+  const value = status.toLowerCase();
+  if (/(inactive|decommission|deorbit|retired|failed|lost)/.test(value)) {
+    return 'bg-red-500/20 border-red-500/30 text-red-400';
+  }
+  if (/(active|operational|nominal|online)/.test(value)) {
+    return 'bg-green-500/20 border-green-500/30 text-green-400';
+  }
+  return 'bg-amber-500/20 border-amber-500/30 text-amber-400';
+}
+
+function SatelliteDialog({ satellite, onClose }: { satellite: SatelliteData; onClose: () => void }) {
+  const { t } = useLanguage();
+  const reduceMotion = useReducedMotion();
+  const titleId = useId();
+  const descId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeRef.current?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+      const items = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (el) => el.offsetParent !== null
+      );
+      if (items.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      const outside = !dialogRef.current.contains(active);
+      if (event.shiftKey && (active === first || outside)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || outside)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus?.();
+    };
+  }, []);
+
+  const panelMotion = reduceMotion
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.15 } }
+    : {
+        initial: { opacity: 0, scale: 0.9, y: 20 },
+        animate: { opacity: 1, scale: 1, y: 0 },
+        exit: { opacity: 0, scale: 0.9, y: 20 },
+        transition: { type: 'spring' as const, damping: 25, stiffness: 300 },
+      };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-black/80 backdrop-blur-sm"
+    >
+      <motion.div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descId}
+        {...panelMotion}
+        className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto overscroll-contain backdrop-blur-xl bg-gradient-to-br from-slate-900/95 via-blue-900/90 to-slate-900/95 border border-white/20 rounded-3xl shadow-2xl"
+      >
+        <button
+          ref={closeRef}
+          type="button"
+          onClick={onClose}
+          aria-label={t('satellite.modal.close')}
+          title={`${t('satellite.modal.close')} (Esc)`}
+          className="absolute top-4 right-4 sm:top-6 sm:right-6 w-10 h-10 flex items-center justify-center backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition-all duration-300 group z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+        >
+          <X
+            className="w-5 h-5 text-white group-hover:rotate-90 transition-transform duration-300"
+            aria-hidden="true"
           />
+        </button>
 
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8"
-            onClick={onClose}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto backdrop-blur-xl bg-gradient-to-br from-slate-900/95 via-blue-900/90 to-slate-900/95 border border-white/20 rounded-3xl shadow-2xl"
-            >
-              {/* Close Button */}
-              <button
-                onClick={onClose}
-                className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 rounded-full transition-all duration-300 group z-10"
-              >
-                <X className="w-5 h-5 text-white group-hover:rotate-90 transition-transform duration-300" />
-              </button>
-
-              {/* Content */}
-              <div className="p-8 md:p-12">
-                {/* Header */}
-                <div className="mb-8">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-14 h-14 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center">
-                      <Satellite className="w-7 h-7 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-white mb-1">{satellite.name}</h2>
-                      <div className="flex items-center gap-2">
-                        <span className="px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full text-green-400 text-xs">
-                          {satellite.status}
-                        </span>
-                        <span className="text-white/60 text-sm">{satellite.type}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-white/70 text-lg leading-relaxed">{satellite.description}</p>
-                </div>
-
-                {/* Stats Grid */}
-                <div className="grid md:grid-cols-2 gap-4 mb-8">
-                  {/* Orbit */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                    className="backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 hover:border-cyan-500/30 transition-all duration-300"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center">
-                        <Globe className="w-5 h-5 text-cyan-400" />
-                      </div>
-                      <span className="text-white/60 text-sm">{t('satellite.modal.orbit')}</span>
-                    </div>
-                    <p className="text-white text-xl">{satellite.orbit}</p>
-                  </motion.div>
-
-                  {/* Altitude */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15 }}
-                    className="backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 hover:border-cyan-500/30 transition-all duration-300"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                        <Activity className="w-5 h-5 text-blue-400" />
-                      </div>
-                      <span className="text-white/60 text-sm">{t('satellite.modal.altitude')}</span>
-                    </div>
-                    <p className="text-white text-xl">{satellite.altitude}</p>
-                  </motion.div>
-
-                  {/* Speed */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 hover:border-cyan-500/30 transition-all duration-300"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                        <Zap className="w-5 h-5 text-purple-400" />
-                      </div>
-                      <span className="text-white/60 text-sm">{t('satellite.modal.speed')}</span>
-                    </div>
-                    <p className="text-white text-xl">{satellite.speed}</p>
-                  </motion.div>
-
-                  {/* Launched */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.25 }}
-                    className="backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 hover:border-cyan-500/30 transition-all duration-300"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                        <span className="text-orange-400">🚀</span>
-                      </div>
-                      <span className="text-white/60 text-sm">{t('satellite.modal.launched')}</span>
-                    </div>
-                    <p className="text-white text-xl">{satellite.launched}</p>
-                  </motion.div>
-                </div>
-
-                {/* Additional Details */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="backdrop-blur-md bg-gradient-to-br from-white/5 to-white/10 border border-white/10 rounded-2xl p-6"
-                >
-                  <h3 className="text-white mb-4">Mission Details</h3>
-                  <div className="grid md:grid-cols-3 gap-6">
-                    <div>
-                      <span className="text-white/60 text-sm block mb-2">{t('satellite.modal.mission')}</span>
-                      <p className="text-white">{satellite.mission}</p>
-                    </div>
-                    <div>
-                      <span className="text-white/60 text-sm block mb-2">{t('satellite.modal.operator')}</span>
-                      <p className="text-white">{satellite.operator}</p>
-                    </div>
-                    <div>
-                      <span className="text-white/60 text-sm block mb-2">{t('satellite.modal.country')}</span>
-                      <p className="text-white">{satellite.country}</p>
-                    </div>
-                  </div>
-                </motion.div>
+        <div className="p-6 sm:p-8 md:p-12">
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-4 pr-12">
+              <div className="w-14 h-14 shrink-0 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center">
+                <Satellite className="w-7 h-7 text-white" aria-hidden="true" />
               </div>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
-  );
-}
+              <div className="min-w-0">
+                <h2 id={titleId} className="text-white mb-1 break-words">
+                  {satellite.name}
+                </h2>
+                <div className="flex flex-wrap items-center gap-2">
