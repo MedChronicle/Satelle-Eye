@@ -1,21 +1,86 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 
-  <!DOCTYPE html>
-  <html lang="en">
-    <head>
-      
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>AI Satellite Imaging Website</title>
-      <meta name="description" content="This web application offers global biodiversity tracking and AI analysis, providing users with insights into environmental health and conservation efforts." />
-      <style>html, body { height: 100%; margin: 0; } #root { height: 100%; }</style>
-      
-    </head>
+    <title>AI Satellite Imaging | Global Biodiversity Tracking</title>
+    <meta
+      name="description"
+      content="Global biodiversity tracking and AI-powered satellite analysis, giving you insights into environmental health and conservation efforts."
+    />
+    <meta name="keywords" content="satellite imaging, biodiversity, AI analysis, conservation, environmental monitoring" />
+    <meta name="author" content="AI Satellite Imaging" />
+    <meta name="robots" content="index, follow" />
 
-    <body>
-      
-      <div id="root"></div>
-      <script type="module" src="/src/main.tsx"></script>
-      
-    </body>
-  </html>
-  
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
+
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="AI Satellite Imaging | Global Biodiversity Tracking" />
+    <meta
+      property="og:description"
+      content="Global biodiversity tracking and AI-powered satellite analysis, giving you insights into environmental health and conservation efforts."
+    />
+    <meta property="og:image" content="/og-image.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AI Satellite Imaging | Global Biodiversity Tracking" />
+    <meta
+      name="twitter:description"
+      content="Global biodiversity tracking and AI-powered satellite analysis, giving you insights into environmental health and conservation efforts."
+    />
+    <meta name="twitter:image" content="/og-image.png" />
+
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+        scroll-behavior: smooth;
+        background-color: #ffffff;
+      }
+      body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+        overflow-x: hidden;
+      }
+      #root {
+        height: 100%;
+      }
+      @media (prefers-color-scheme: dark) {
+        html {
+          background-color: #0a0a0a;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+      .no-js-message {
+        font-family: system-ui, sans-serif;
+        padding: 2rem;
+        text-align: center;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <p class="no-js-message">This website needs JavaScript to run. Please enable it in your browser settings.</p>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
